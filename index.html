@@ -68,7 +68,7 @@ td.n,th.n{text-align:right}
 <div class="card">
   <div class="bar">
     <input id="q" placeholder="Buscar cliente o quién pica…">
-    <button class="sec" id="exp">Exportar CSV</button><button class="sec" id="imp" hidden>Subir datos locales a la base</button>
+    <button class="sec" id="exp">Exportar CSV</button><button class="sec" id="act">↻ Actualizar</button><button class="sec" id="con">☁ Conectar planilla</button>
   </div>
   <div class="tw"><table>
     <thead><tr>
@@ -86,19 +86,25 @@ let rows=[],sortK="cliente",sortDir=1;
 const $=i=>document.getElementById(i);
 try{rows=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){rows=[]}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(rows))}catch(e){}}
-let db=null;const WIN=15; // dias de la ventana de alerta
+let API="";try{API=localStorage.getItem("pica_api")||""}catch(e){}
+const WIN=15; // dias de la ventana de alerta
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","setiembre","octubre","noviembre","diciembre"];
 function ventana(){const t=new Date(),y=t.getFullYear(),m=t.getMonth();
   if((m===8||m===0)&&t.getDate()<=WIN)return{on:true,start:iso(new Date(y,m,1)),mes:MES[m]};
   const ny=m>=8?y+1:y,nm=m>=8?0:8;
   return{on:false,next:new Date(ny,nm,1),mes:MES[nm]}}
-async function saveRow(o){
-  if(db){try{await db.doc("clientes/"+o.id).set(o)}catch(e){alert("No se pudo guardar en la base de datos.")}}
-  else{const i=rows.findIndex(r=>r.id===o.id);if(i>=0)rows[i]=o;else rows.push(o);persist();render()}}
-async function delRow(id){
-  if(db){try{await db.doc("clientes/"+id).delete()}catch(e){alert("No se pudo borrar.")}}
-  else{rows=rows.filter(r=>r.id!==id);persist();render()}}
+const st=t=>{$("st").textContent=t};
+async function post(b){if(!API)return;st("⏳ Guardando…");
+  try{await fetch(API,{method:"POST",body:JSON.stringify(b)});st("☁ Guardado en la planilla")}
+  catch(e){st("⚠ No se pudo guardar en la planilla (¿sin conexión?). Quedó solo en este dispositivo.")}}
+async function pull(){if(!API)return;st("⏳ Actualizando…");
+  try{const j=await(await fetch(API)).json();rows=j.rows.map(norm);persist();render();
+    st("☁ Conectado a Google Sheets · actualizado "+new Date().toLocaleTimeString("es-UY",{hour:"2-digit",minute:"2-digit"}))}
+  catch(e){st("⚠ No se pudo leer la planilla. Mostrando los datos de este dispositivo.")}}
+async function saveRow(o){o=norm(o);const i=rows.findIndex(r=>r.id===o.id);
+  if(i>=0)rows[i]=o;else rows.push(o);persist();render();await post({action:"upsert",rows:[o]})}
+async function delRow(id){rows=rows.filter(r=>r.id!==id);persist();render();await post({action:"delete",id})}
 function norm(o){return{id:String(o.id),cliente:o.cliente||"",quien:o.quien||"",ub:o.ub||"",vo:num(o.vo),ve:num(o.ve),inv:num(o.inv),fv:o.fv||""}}
 const num=v=>parseFloat(v)||0;
 function mapUrl(v){v=v.trim();return /^https?:\/\//i.test(v)?v:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v)}
@@ -157,22 +163,25 @@ document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
   const k=th.dataset.k;sortDir=(sortK===k)?-sortDir:1;sortK=k;render()});
 $("exp").onclick=async()=>{
   const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const csv="\uFEFFCliente,Quien pica,Ubicacion,V.O.,Has verano,Has invierno,Ultima visita\n"+
-    rows.map(r=>[esc(r.cliente),esc(r.quien),esc(r.ub||""),r.vo,r.ve,r.inv,r.fv||""].join(",")).join("\n");
+  const csv="\uFEFFCliente;Quien pica;Ubicacion;V.O.;Has verano;Has invierno;Ultima visita\n"+
+    rows.map(r=>[esc(r.cliente),esc(r.quien),esc(r.ub||""),String(r.vo).replace(".",","),String(r.ve).replace(".",","),String(r.inv).replace(".",","),r.fv||""].join(";")).join("\n");
   try{
     const dl=window.claude&&await window.claude.use("downloads");
     if(dl){await dl.save({filename:"clientes_pica.csv",data:csv});return}
   }catch(e){}
   try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="clientes_pica.csv";a.click()}catch(e){}
 };
+$("con").onclick=async()=>{
+  const u=prompt("Pegá la URL de la aplicación web de Google (termina en /exec). Dejalo vacío para volver al modo local:",API);
+  if(u===null)return;API=u.trim();try{localStorage.setItem("pica_api",API)}catch(e){}
+  if(!API){st("Modo local: los datos quedan solo en este navegador.");return}
+  try{st("⏳ Conectando…");const j=await(await fetch(API)).json();const ids=new Set(j.rows.map(r=>String(r.id)));
+    const nuevos=rows.filter(r=>!ids.has(r.id));if(nuevos.length)await post({action:"upsert",rows:nuevos});await pull()}
+  catch(e){st("⚠ No se pudo conectar. Revisá la URL y que el acceso sea «Cualquier persona».")}};
+$("act").onclick=pull;
 rows=rows.map(norm);render();
-(async()=>{try{
-  const c=window.claude&&await window.claude.use("db");if(!c)throw 0;
-  db=c;$("st").textContent="☁ Base de datos conectada: tus datos se guardan online y los ves desde cualquier dispositivo.";
-  const loc=rows.slice();
-  db.collection("clientes").onSnapshot(s=>{rows=s.docs.map(d=>norm({...d.data(),id:d.id}));render()},()=>{$("st").textContent="No se pudo leer la base de datos."});
-  if(loc.length){$("imp").hidden=false;$("imp").onclick=async()=>{for(const r of loc)await db.doc("clientes/"+r.id).set(r);$("imp").hidden=true}}
-}catch(e){$("st").textContent="Modo local: los datos quedan solo en este navegador."}})();
+if(API){pull();document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()})}
+else st("Modo local: los datos quedan solo en este navegador. Tocá «Conectar planilla» para guardarlos en Google Sheets.");
 </script>
 </body>
 </html>
