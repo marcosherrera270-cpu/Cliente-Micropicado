@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clientes de picado</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f1ea;--card:#fff;--tx:#1f2a1f;--mut:#6b7566;--ac:#3f7a3a;--bd:#ddd8cb;--sum:#e5efdc;--dg:#b3402f;--wn:#fff1d6;--wt:#8a5a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171a16;--card:#222620;--tx:#e8ece4;--mut:#9aa595;--ac:#7bc272;--bd:#363c33;--sum:#2a3326;--dg:#e07a68;--wn:#3a3020;--wt:#f0c26a}}
+:root[data-theme="dark"]{--wn:#3a3020;--wt:#f0c26a;--bg:#171a16;--card:#222620;--tx:#e8ece4;--mut:#9aa595;--ac:#7bc272;--bd:#363c33;--sum:#2a3326;--dg:#e07a68}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+main{max-width:980px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mut);font-size:14px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:4px}
+input{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--ac);background:var(--ac);color:#fff;cursor:pointer}
+button.sec{background:transparent;color:var(--ac)}
+button.dg{background:transparent;color:var(--dg);border-color:var(--bd);padding:4px 8px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.bar input{flex:1;min-width:160px}
+.sums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.sums div{background:var(--sum);border-radius:10px;padding:10px 12px}
+.sums b{display:block;font-size:22px}
+.sums span{font-size:12px;color:var(--mut)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--mut);cursor:pointer}
+td.n,th.n{text-align:right}
+.alert{background:var(--wn);color:var(--wt);border:1px solid var(--wt);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px}.alert b{display:block;margin-bottom:4px}.alert.info{background:var(--sum);color:var(--tx);border-color:var(--bd)}.badge{font-size:12px;color:var(--wt);background:var(--wn);border-radius:6px;padding:2px 6px;margin-left:6px}.st{font-size:12px;color:var(--mut);margin-bottom:8px}
+.empty{color:var(--mut);text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>🌾 Clientes de picado</h1>
+<div class="sub">Base de datos de clientes: quién pica, ubicación, vacas en ordeñe y hectáreas aproximadas.</div>
+
+<div id="alert" class="alert" hidden></div>
+<div class="st" id="st"></div>
+<div class="sums">
+  <div><b id="sC">0</b><span>Clientes</span></div>
+  <div><b id="sV">0</b><span>V.O. total</span></div>
+  <div><b id="sVe">0</b><span>Has verano</span></div>
+  <div><b id="sIn">0</b><span>Has invierno</span></div>
+</div>
+
+<div class="card">
+<form id="f">
+  <input type="hidden" id="id">
+  <label>Cliente<input id="cliente" required></label>
+  <label>Quién pica<input id="quien" placeholder="Contratista / maquinista"></label>
+  <label>Ubicación (link de Google Maps o dirección)<input id="ub" placeholder="https://maps.app.goo.gl/… o dirección"></label>
+  <label>Vacas en ordeñe (V.O.)<input id="vo" type="number" min="0" inputmode="numeric"></label>
+  <label>Has pica verano<input id="ve" type="number" min="0" step="any" inputmode="decimal"></label>
+  <label>Has pica invierno<input id="inv" type="number" min="0" step="any" inputmode="decimal"></label>
+  <label>Fecha de visita / contacto<input id="fv" type="date"></label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="sec" id="gps">📍 Mi ubicación</button><button type="submit" id="save">Agregar</button><button type="button" class="sec" id="cancel" hidden>Cancelar</button></div>
+</form>
+</div>
+
+<div class="card">
+  <div class="bar">
+    <input id="q" placeholder="Buscar cliente o quién pica…">
+    <button class="sec" id="exp">Exportar CSV</button><button class="sec" id="imp" hidden>Subir datos locales a la base</button>
+  </div>
+  <div class="tw"><table>
+    <thead><tr>
+      <th data-k="cliente">Cliente</th><th data-k="quien">Quién pica</th><th data-k="ub">Ubicación</th>
+      <th class="n" data-k="vo">V.O.</th><th class="n" data-k="ve">Has verano</th><th class="n" data-k="inv">Has invierno</th><th data-k="fv">Última visita</th><th></th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table></div>
+</div>
+</main>
+
+<script>
+const KEY="clientes_pica_v1";
+let rows=[],sortK="cliente",sortDir=1;
+const $=i=>document.getElementById(i);
+try{rows=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){rows=[]}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(rows))}catch(e){}}
+let db=null;const WIN=15; // dias de la ventana de alerta
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const MES=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","setiembre","octubre","noviembre","diciembre"];
+function ventana(){const t=new Date(),y=t.getFullYear(),m=t.getMonth();
+  if((m===8||m===0)&&t.getDate()<=WIN)return{on:true,start:iso(new Date(y,m,1)),mes:MES[m]};
+  const ny=m>=8?y+1:y,nm=m>=8?0:8;
+  return{on:false,next:new Date(ny,nm,1),mes:MES[nm]}}
+async function saveRow(o){
+  if(db){try{await db.doc("clientes/"+o.id).set(o)}catch(e){alert("No se pudo guardar en la base de datos.")}}
+  else{const i=rows.findIndex(r=>r.id===o.id);if(i>=0)rows[i]=o;else rows.push(o);persist();render()}}
+async function delRow(id){
+  if(db){try{await db.doc("clientes/"+id).delete()}catch(e){alert("No se pudo borrar.")}}
+  else{rows=rows.filter(r=>r.id!==id);persist();render()}}
+function norm(o){return{id:String(o.id),cliente:o.cliente||"",quien:o.quien||"",ub:o.ub||"",vo:num(o.vo),ve:num(o.ve),inv:num(o.inv),fv:o.fv||""}}
+const num=v=>parseFloat(v)||0;
+function mapUrl(v){v=v.trim();return /^https?:\/\//i.test(v)?v:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v)}
+
+const fmt=n=>n.toLocaleString("es-UY",{maximumFractionDigits:1});
+
+function render(){
+  const w=ventana();const q=$("q").value.toLowerCase();
+  let list=rows.filter(r=>(r.cliente+" "+r.quien+" "+(r.ub||"")).toLowerCase().includes(q));
+  list.sort((a,b)=>{const x=a[sortK],y=b[sortK];
+    return (typeof x==="number"?x-y:String(x).localeCompare(String(y),"es"))*sortDir});
+  const tb=$("tb");tb.textContent="";
+  if(!list.length){const tr=tb.insertRow(),td=tr.insertCell();td.colSpan=8;td.className="empty";td.textContent="Sin registros";}
+  list.forEach(r=>{
+    const tr=tb.insertRow();
+    tr.insertCell().textContent=r.cliente;
+    tr.insertCell().textContent=r.quien;
+    const u=tr.insertCell();
+    if(r.ub){const a=document.createElement("a");a.href=mapUrl(r.ub);a.target="_blank";a.rel="noopener";a.textContent="📍 Ver mapa";a.style.color="var(--ac)";u.append(a)}
+    [r.vo,r.ve,r.inv].forEach(v=>{const c=tr.insertCell();c.textContent=fmt(v);c.className="n"});
+    const fc=tr.insertCell();fc.textContent=r.fv?r.fv.split("-").reverse().join("/"):"—";
+    if(w.on&&(!r.fv||r.fv<w.start)){const b=document.createElement("span");b.className="badge";b.textContent="⚠ Sin contactar";fc.append(b)}
+    const c=tr.insertCell();
+    const h=document.createElement("button");h.className="dg";h.style.color="var(--ac)";h.textContent="✓ Hoy";h.title="Marcar contactado hoy";h.onclick=()=>saveRow({...r,fv:iso(new Date())});
+    const e=document.createElement("button");e.className="dg";e.style.color="var(--ac)";e.textContent="Editar";e.onclick=()=>edit(r.id);
+    const d=document.createElement("button");d.className="dg";d.textContent="Borrar";d.style.marginLeft="6px";d.onclick=()=>del(r.id);
+    c.append(h,e,d);e.style.marginLeft="6px";
+  });
+  const al=$("alert");al.hidden=false;
+  if(w.on){const p=rows.filter(r=>!r.fv||r.fv<w.start);al.className="alert";al.textContent="";
+    const b=document.createElement("b");b.textContent="⚠ Ronda de contacto de "+w.mes+": "+p.length+" cliente(s) sin contactar";al.append(b);
+    al.append(p.length?p.map(r=>r.cliente).join(", "):"Todos los clientes fueron contactados. ¡Bien!")}
+  else{al.className="alert info";al.textContent="Próxima ronda de contactos: primeros días de "+w.mes+" ("+w.next.getFullYear()+"). Ese día te aparecerá la alerta con los clientes sin contactar."}
+  $("sC").textContent=list.length;
+  $("sV").textContent=fmt(list.reduce((s,r)=>s+r.vo,0));
+  $("sVe").textContent=fmt(list.reduce((s,r)=>s+r.ve,0));
+  $("sIn").textContent=fmt(list.reduce((s,r)=>s+r.inv,0));
+}
+function reset(){$("f").reset();$("id").value="";$("save").textContent="Agregar";$("cancel").hidden=true}
+function edit(id){const r=rows.find(x=>x.id===id);if(!r)return;
+  $("id").value=id;$("cliente").value=r.cliente;$("quien").value=r.quien;$("ub").value=r.ub||"";$("vo").value=r.vo;$("ve").value=r.ve;$("inv").value=r.inv;$("fv").value=r.fv||"";
+  $("save").textContent="Guardar";$("cancel").hidden=false;window.scrollTo({top:0,behavior:"smooth"})}
+function del(id){if(!confirm("¿Borrar este cliente?"))return;delRow(id)}
+$("f").onsubmit=e=>{e.preventDefault();
+  const o={id:$("id").value||String(Date.now()),cliente:$("cliente").value.trim(),quien:$("quien").value.trim(),ub:$("ub").value.trim(),
+    vo:num($("vo").value),ve:num($("ve").value),inv:num($("inv").value),fv:$("fv").value};
+  saveRow(o);reset()};
+$("cancel").onclick=reset;
+$("gps").onclick=()=>{
+  if(!navigator.geolocation){alert("Tu navegador no permite obtener la ubicación.");return}
+  navigator.geolocation.getCurrentPosition(p=>{$("ub").value=p.coords.latitude.toFixed(6)+", "+p.coords.longitude.toFixed(6)},
+    ()=>alert("No se pudo obtener la ubicación. Pegá el link de Google Maps."));
+};
+$("q").oninput=render;
+document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k;sortDir=(sortK===k)?-sortDir:1;sortK=k;render()});
+$("exp").onclick=async()=>{
+  const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const csv="\uFEFFCliente,Quien pica,Ubicacion,V.O.,Has verano,Has invierno,Ultima visita\n"+
+    rows.map(r=>[esc(r.cliente),esc(r.quien),esc(r.ub||""),r.vo,r.ve,r.inv,r.fv||""].join(",")).join("\n");
+  try{
+    const dl=window.claude&&await window.claude.use("downloads");
+    if(dl){await dl.save({filename:"clientes_pica.csv",data:csv});return}
+  }catch(e){}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="clientes_pica.csv";a.click()}catch(e){}
+};
+rows=rows.map(norm);render();
+(async()=>{try{
+  const c=window.claude&&await window.claude.use("db");if(!c)throw 0;
+  db=c;$("st").textContent="☁ Base de datos conectada: tus datos se guardan online y los ves desde cualquier dispositivo.";
+  const loc=rows.slice();
+  db.collection("clientes").onSnapshot(s=>{rows=s.docs.map(d=>norm({...d.data(),id:d.id}));render()},()=>{$("st").textContent="No se pudo leer la base de datos."});
+  if(loc.length){$("imp").hidden=false;$("imp").onclick=async()=>{for(const r of loc)await db.doc("clientes/"+r.id).set(r);$("imp").hidden=true}}
+}catch(e){$("st").textContent="Modo local: los datos quedan solo en este navegador."}})();
+</script>
+</body>
+</html>
