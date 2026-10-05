@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Clientes de picado</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3f7a3a">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Picado">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 --bg:#f4f1ea;--card:#fff;--tx:#1f2a1f;--mut:#6b7566;--ac:#3f7a3a;--bd:#ddd8cb;--sum:#e5efdc;--dg:#b3402f;--wn:#fff1d6;--wt:#8a5a00}
@@ -265,6 +271,7 @@ $("act").onclick=pull;
 rows=rows.map(norm);render();
 if(API){pull();document.addEventListener("visibilitychange",()=>{if(!document.hidden)pull()})}
 else st("Modo local: los datos quedan solo en este navegador. Tocá «Conectar planilla» para guardarlos en Google Sheets.");
+try{if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 </script>
 </body>
 </html>
