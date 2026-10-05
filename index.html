@@ -35,6 +35,16 @@ th{font-size:12px;color:var(--mut);cursor:pointer}
 td.n,th.n{text-align:right}td.cm{max-width:220px;overflow:hidden;text-overflow:ellipsis}select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}textarea{min-height:64px;resize:vertical}.full{grid-column:1/-1}.sec-t{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--ac);margin-top:6px}
 .alert{background:var(--wn);color:var(--wt);border:1px solid var(--wt);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px}.alert b{display:block;margin-bottom:4px}.alert.info{background:var(--sum);color:var(--tx);border-color:var(--bd)}.badge{font-size:12px;color:var(--wt);background:var(--wn);border-radius:6px;padding:2px 6px;margin-left:6px}.st{font-size:12px;color:var(--mut);margin-bottom:8px}
 .empty{color:var(--mut);text-align:center;padding:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chip{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:999px;padding:8px 14px;font-size:15px}
+.chip.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.crop{display:grid;grid-template-columns:1fr 1.3fr 80px 140px auto;gap:8px;align-items:center;background:var(--sum);border-radius:10px;padding:8px 10px;margin-bottom:8px}
+.crop b{font-size:15px}
+.tot{color:var(--ac);font-weight:600;text-transform:none;letter-spacing:0}
+.tag{background:var(--sum);border-radius:6px;padding:2px 8px;margin:2px 0;font-size:13px}
+.est{grid-column:1/-1;font-size:12px;color:var(--mut)}.pl{padding:5px 0;border-bottom:1px solid var(--bd);font-size:14px}
+@media(max-width:560px){.crop{grid-template-columns:1fr 1fr auto}.crop b,.crop .cv{grid-column:1/-1}}
+.otro{display:flex;gap:8px;margin-bottom:10px}.otro input{flex:1}
 </style>
 </head>
 <body>
@@ -53,6 +63,7 @@ td.n,th.n{text-align:right}td.cm{max-width:220px;overflow:hidden;text-overflow:e
   <div><b id="sIn">0</b><span>Has invierno</span></div>
 </div>
 
+<div class="card" id="pic" hidden></div>
 <div class="card">
 <form id="f">
   <input type="hidden" id="id">
@@ -64,19 +75,16 @@ td.n,th.n{text-align:right}td.cm{max-width:220px;overflow:hidden;text-overflow:e
   <div class="sec-t">Establecimiento</div>
   <label>Tipo<select id="tipo"><option value="">—</option><option>Tambo</option><option>Corral</option><option>Tambo y corral</option></select></label>
   <label>Animales (cantidad)<input id="an" type="number" min="0" inputmode="numeric"></label>
-  <div class="sec-t">Picado de verano</div>
-  <label>Cultivo<select id="cv"></select></label>
-  <label id="cvoL" hidden>Otro cultivo<input id="cvo" placeholder="Escribí el cultivo"></label>
-  <label>Has pica verano<input id="ve" type="number" min="0" step="any" inputmode="decimal"></label>
-  <div class="sec-t">Picado de invierno</div>
-  <label>Cultivo<select id="ci"></select></label>
-  <label id="cioL" hidden>Otro cultivo<input id="cio" placeholder="Escribí el cultivo"></label>
-  <label>Has pica invierno<input id="inv" type="number" min="0" step="any" inputmode="decimal"></label>
+  <div class="sec-t">☀️ Picado de verano <span id="tv" class="tot"></span></div>
+  <div class="full" id="boxv"></div>
+  <div class="sec-t">❄️ Picado de invierno <span id="ti" class="tot"></span></div>
+  <div class="full" id="boxi"></div>
   <div class="sec-t">Seguimiento</div>
   <label>Fecha de visita / contacto<input id="fv" type="date"></label>
   <label class="full">Comentario<textarea id="com" placeholder="Cualquier dato adicional…"></textarea></label>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="sec" id="gps">📍 Mi ubicación</button><button type="submit" id="save">Agregar</button><button type="button" class="sec" id="cancel" hidden>Cancelar</button></div>
 </form>
+<datalist id="vars"></datalist>
 </div>
 
 <div class="card">
@@ -99,11 +107,46 @@ td.n,th.n{text-align:right}td.cm{max-width:220px;overflow:hidden;text-overflow:e
 <script>
 const $=i=>document.getElementById(i);
 const KEY="clientes_pica_v1";
-const CROPS=["Maíz","Sorgo","Moha","Avena","Cebada","Trigo","Raigrás","Alfalfa","Pastura / pradera","Otro"];
-function fillSel(id){const s=$(id);s.innerHTML="<option value=\"\">—</option>"+CROPS.map(c=>"<option>"+c+"</option>").join("")}
-function getCrop(s,t){const v=$(s).value;return v==="Otro"?($(t).value.trim()||"Otro"):v}
-function setCrop(s,t,v){const S=$(s),T=$(t);if(!v){S.value="";T.value=""}else if(CROPS.includes(v)&&v!=="Otro"){S.value=v;T.value=""}else{S.value="Otro";T.value=v==="Otro"?"":v}tog(s,t)}
-function tog(s,t){$(t+"L").hidden=$(s).value!=="Otro"}
+const CROPS={"Maíz":"🌽","Sorgo":"🌾","Moha":"🌿","Avena":"🌾","Cebada":"🌾","Trigo":"🌾","Raigrás":"🌱","Alfalfa":"🍀","Pastura / pradera":"🌱"};
+const emo=c=>CROPS[c]||"🌱";
+const clean=s=>String(s||"").replace(/[;\[\]]/g," ").replace(/\s+/g," ").trim();
+const sum=l=>Math.round(l.reduce((s,x)=>s+(+x.h||0),0)*100)/100;
+function ser(l){return l.filter(x=>x.c).map(x=>x.c+(x.v?" ["+x.v+"]":"")+" "+(+x.h||0)+" ha"+(x.s?" siembra "+x.s:"")).join("; ")}
+function parse(s,tot){s=String(s||"").trim();if(!s)return[];
+  const l=s.split(/;\s*/).map(p=>{const m=p.match(/^(.*?)(?:\s*\[(.*?)\])?\s+([\d.,]+)\s*ha(?:\s+siembra\s+(\d{4}-\d{2}-\d{2}))?$/);
+    return m?{c:m[1],v:m[2]||"",h:num(m[3].replace(",",".")),s:m[4]||""}:{c:p,v:"",h:0,s:""}});
+  if(l.length===1&&!l[0].h&&tot)l[0].h=tot;return l}
+const DAYS={"Maíz":130,"Sorgo":120,"Moha":70,"Avena":140,"Cebada":150,"Trigo":160,"Raigrás":100};
+const mk=c=>({c,v:"",h:0,s:""});
+const dt=s=>new Date(s+"T12:00:00");
+const fd=d=>d.toLocaleDateString("es-UY",{day:"2-digit",month:"2-digit",year:"numeric"});
+function pica(x){if(!x.s||!DAYS[x.c])return null;const d=dt(x.s);d.setDate(d.getDate()+DAYS[x.c]);return d}
+function est(x){if(!DAYS[x.c])return"";const p=pica(x);return p?"🚜 Pica aprox.: "+fd(p)+" ("+DAYS[x.c]+" días desde la siembra)":"Cargá la fecha de siembra para estimar cuándo se pica"}
+let FC={v:[],i:[]};
+function tot(k){$("t"+k).textContent=FC[k].length?"· "+fmt(sum(FC[k]))+" has":""}
+function cropUI(k){const box=$("box"+k),L=FC[k];box.textContent="";
+  const chips=document.createElement("div");chips.className="chips";
+  const names=Object.keys(CROPS);L.forEach(x=>{if(!names.includes(x.c))names.push(x.c)});
+  names.forEach(c=>{const b=document.createElement("button");b.type="button";b.className="chip"+(L.some(x=>x.c===c)?" on":"");b.textContent=emo(c)+" "+c;
+    b.onclick=()=>{const i=L.findIndex(x=>x.c===c);if(i>=0)L.splice(i,1);else L.push(mk(c));cropUI(k)};chips.append(b)});
+  box.append(chips);
+  const ot=document.createElement("div");ot.className="otro";
+  const oi=document.createElement("input");oi.placeholder="Otro cultivo: escribí el nombre";
+  const ob=document.createElement("button");ob.type="button";ob.className="sec";ob.textContent="＋ Agregar";
+  const add=()=>{const c=clean(oi.value);if(!c)return;if(!L.some(x=>x.c.toLowerCase()===c.toLowerCase()))L.push(mk(c));cropUI(k)};
+  ob.onclick=add;oi.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add()}};
+  ot.append(oi,ob);box.append(ot);
+  L.forEach((x,i)=>{const r=document.createElement("div");r.className="crop";
+    const t=document.createElement("b");t.textContent=emo(x.c)+" "+x.c;
+    const v=document.createElement("input");v.placeholder="Variedad / híbrido";v.value=x.v;v.setAttribute("list","vars");v.className="cv";v.oninput=()=>{x.v=clean(v.value)};
+    const h=document.createElement("input");h.type="number";h.min=0;h.step="any";h.inputMode="decimal";h.placeholder="Has";h.value=x.h||"";h.oninput=()=>{x.h=num(h.value);tot(k)};
+    const d=document.createElement("button");d.type="button";d.className="dg";d.textContent="✕";d.title="Quitar";d.onclick=()=>{L.splice(i,1);cropUI(k)};
+    const es=document.createElement("div");es.className="est";es.textContent=est(x);
+    const f=document.createElement("input");f.type="date";f.value=x.s||"";f.title="Fecha de siembra";f.oninput=()=>{x.s=f.value;es.textContent=est(x)};
+    r.append(t,v,h,f,d,es);box.append(r)});
+  tot(k)}
+function cropCell(td,s,t){const l=parse(s,t);if(!l.length){td.textContent="—";return}
+  l.forEach(x=>{const d=document.createElement("div");d.className="tag";d.textContent=emo(x.c)+" "+x.c+(x.v?" · "+x.v:"")+(x.h?" · "+fmt(x.h)+" ha":"")+(x.s?" · sembrado "+fd(dt(x.s)):"")+(pica(x)?" · pica ~"+fd(pica(x)):"");td.append(d)})}
 let rows=[],sortK="cliente",sortDir=1;
 try{rows=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){rows=[]}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(rows))}catch(e){}}
@@ -127,7 +170,7 @@ async function saveRow(o){o=norm(o);const i=rows.findIndex(r=>r.id===o.id);
   if(i>=0)rows[i]=o;else rows.push(o);persist();render();await post({action:"upsert",rows:[o]})}
 async function delRow(id){rows=rows.filter(r=>r.id!==id);persist();render();await post({action:"delete",id})}
 function nfv(v){v=String(v||"");if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;const d=new Date(v);return isNaN(d)?"":iso(d)}
-function norm(o){return{id:String(o.id),cliente:o.cliente||"",tel:String(o.tel||""),quien:o.quien||"",ub:o.ub||"",tipo:o.tipo||"",an:num(o.an!==undefined?o.an:o.vo),cv:o.cv||"",ve:num(o.ve),ci:o.ci||"",inv:num(o.inv),fv:nfv(o.fv),com:o.com||""}}
+function norm(o){const a=parse(o.cv,num(o.ve)),b=parse(o.ci,num(o.inv));return{id:String(o.id),cliente:o.cliente||"",tel:String(o.tel||""),quien:o.quien||"",ub:o.ub||"",tipo:o.tipo||"",an:num(o.an!==undefined?o.an:o.vo),cv:ser(a),ve:a.length?sum(a):num(o.ve),ci:ser(b),inv:b.length?sum(b):num(o.inv),fv:nfv(o.fv),com:o.com||""}}
 const num=v=>parseFloat(v)||0;
 function mapUrl(v){v=v.trim();return /^https?:\/\//i.test(v)?v:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v)}
 
@@ -149,9 +192,9 @@ function render(){
     if(r.ub){const a=document.createElement("a");a.href=mapUrl(r.ub);a.target="_blank";a.rel="noopener";a.textContent="📍 Ver mapa";a.style.color="var(--ac)";u.append(a)}
     tr.insertCell().textContent=r.tipo||"—";
     const ca=tr.insertCell();ca.textContent=fmt(r.an);ca.className="n";
-    tr.insertCell().textContent=r.cv||"—";
+    cropCell(tr.insertCell(),r.cv,r.ve);
     const cve=tr.insertCell();cve.textContent=fmt(r.ve);cve.className="n";
-    tr.insertCell().textContent=r.ci||"—";
+    cropCell(tr.insertCell(),r.ci,r.inv);
     const cin=tr.insertCell();cin.textContent=fmt(r.inv);cin.className="n";
     const fc=tr.insertCell();fc.textContent=r.fv?r.fv.split("-").reverse().join("/"):"—";
     if(w.on&&(!r.fv||r.fv<w.start)){const b=document.createElement("span");b.className="badge";b.textContent="⚠ Sin contactar";fc.append(b)}
@@ -167,6 +210,12 @@ function render(){
     const b=document.createElement("b");b.textContent="⚠ Ronda de contacto de "+w.mes+": "+p.length+" cliente(s) sin contactar";al.append(b);
     al.append(p.length?p.map(r=>r.cliente).join(", "):"Todos los clientes fueron contactados. ¡Bien!")}
   else{al.className="alert info";al.textContent="Próxima ronda de contactos: primeros días de "+w.mes+" ("+w.next.getFullYear()+"). Ese día te aparecerá la alerta con los clientes sin contactar."}
+  const dl=$("vars");dl.textContent="";new Set(rows.flatMap(r=>[...parse(r.cv),...parse(r.ci)]).map(x=>x.v).filter(Boolean)).forEach(v=>{const op=document.createElement("option");op.value=v;dl.append(op)});
+  const pc=$("pic"),hoy=new Date();hoy.setDate(hoy.getDate()-10);
+  const pl=rows.flatMap(r=>[["☀️",parse(r.cv,r.ve)],["❄️",parse(r.ci,r.inv)]].flatMap(([ic,l])=>l.map(x=>({r,x,ic,p:pica(x)})))).filter(o=>o.p&&o.p>=hoy).sort((a,b)=>a.p-b.p).slice(0,12);
+  pc.hidden=!pl.length;pc.textContent="";
+  if(pl.length){const h=document.createElement("b");h.textContent="🚜 Próximas picas (fecha aproximada)";pc.append(h);
+    pl.forEach(o=>{const d=document.createElement("div");d.className="pl";d.textContent=fd(o.p)+" · "+o.ic+" "+emo(o.x.c)+" "+o.x.c+(o.x.v?" ("+o.x.v+")":"")+(o.x.h?" · "+fmt(o.x.h)+" ha":"")+" · "+o.r.cliente;pc.append(d)})}
   $("sC").textContent=list.length;
   $("sT").textContent=list.filter(r=>/tambo/i.test(r.tipo)).length;
   $("sK").textContent=list.filter(r=>/corral/i.test(r.tipo)).length;
@@ -174,18 +223,18 @@ function render(){
   $("sVe").textContent=fmt(list.reduce((s,r)=>s+r.ve,0));
   $("sIn").textContent=fmt(list.reduce((s,r)=>s+r.inv,0));
 }
-function reset(){$("f").reset();tog("cv","cvo");tog("ci","cio");$("id").value="";$("save").textContent="Agregar";$("cancel").hidden=true}
+function reset(){$("f").reset();FC={v:[],i:[]};cropUI("v");cropUI("i");$("id").value="";$("save").textContent="Agregar";$("cancel").hidden=true}
 function edit(id){const r=rows.find(x=>x.id===id);if(!r)return;
   $("id").value=id;$("cliente").value=r.cliente;$("tel").value=r.tel||"";$("quien").value=r.quien;$("ub").value=r.ub||"";
-  $("tipo").value=r.tipo||"";$("an").value=r.an;setCrop("cv","cvo",r.cv);$("ve").value=r.ve;setCrop("ci","cio",r.ci);$("inv").value=r.inv;$("fv").value=r.fv||"";$("com").value=r.com||"";
+  $("tipo").value=r.tipo||"";$("an").value=r.an;FC={v:parse(r.cv,r.ve),i:parse(r.ci,r.inv)};cropUI("v");cropUI("i");$("fv").value=r.fv||"";$("com").value=r.com||"";
   $("save").textContent="Guardar";$("cancel").hidden=false;window.scrollTo({top:0,behavior:"smooth"})}
 function del(id){if(!confirm("¿Borrar este cliente?"))return;delRow(id)}
 $("f").onsubmit=e=>{e.preventDefault();
   const o={id:$("id").value||String(Date.now()),cliente:$("cliente").value.trim(),tel:$("tel").value.trim(),quien:$("quien").value.trim(),ub:$("ub").value.trim(),
-    tipo:$("tipo").value,an:num($("an").value),cv:getCrop("cv","cvo"),ve:num($("ve").value),ci:getCrop("ci","cio"),inv:num($("inv").value),fv:$("fv").value,com:$("com").value.trim()};
+    tipo:$("tipo").value,an:num($("an").value),cv:ser(FC.v),ve:sum(FC.v),ci:ser(FC.i),inv:sum(FC.i),fv:$("fv").value,com:$("com").value.trim()};
   saveRow(o);reset()};
 $("cancel").onclick=reset;
-fillSel("cv");fillSel("ci");$("cv").onchange=()=>tog("cv","cvo");$("ci").onchange=()=>tog("ci","cio");
+cropUI("v");cropUI("i");
 $("gps").onclick=()=>{
   if(!navigator.geolocation){alert("Tu navegador no permite obtener la ubicación.");return}
   navigator.geolocation.getCurrentPosition(p=>{$("ub").value=p.coords.latitude.toFixed(6)+", "+p.coords.longitude.toFixed(6)},
