@@ -32,7 +32,7 @@ button.dg{background:transparent;color:var(--dg);border-color:var(--bd);padding:
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
 th{font-size:12px;color:var(--mut);cursor:pointer}
-td.n,th.n{text-align:right}
+td.n,th.n{text-align:right}td.cm{max-width:220px;overflow:hidden;text-overflow:ellipsis}select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}textarea{min-height:64px;resize:vertical}.full{grid-column:1/-1}.sec-t{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--ac);margin-top:6px}
 .alert{background:var(--wn);color:var(--wt);border:1px solid var(--wt);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px}.alert b{display:block;margin-bottom:4px}.alert.info{background:var(--sum);color:var(--tx);border-color:var(--bd)}.badge{font-size:12px;color:var(--wt);background:var(--wn);border-radius:6px;padding:2px 6px;margin-left:6px}.st{font-size:12px;color:var(--mut);margin-bottom:8px}
 .empty{color:var(--mut);text-align:center;padding:20px}
 </style>
@@ -40,13 +40,15 @@ td.n,th.n{text-align:right}
 <body>
 <main>
 <h1>🌾 Clientes de picado</h1>
-<div class="sub">Base de datos de clientes: quién pica, ubicación, vacas en ordeñe y hectáreas aproximadas.</div>
+<div class="sub">Base de datos de clientes: establecimiento, animales, quién pica, cultivos y hectáreas aproximadas.</div>
 
 <div id="alert" class="alert" hidden></div>
 <div class="st" id="st"></div>
 <div class="sums">
   <div><b id="sC">0</b><span>Clientes</span></div>
-  <div><b id="sV">0</b><span>V.O. total</span></div>
+  <div><b id="sT">0</b><span>Tambos</span></div>
+  <div><b id="sK">0</b><span>Corrales</span></div>
+  <div><b id="sV">0</b><span>Animales total</span></div>
   <div><b id="sVe">0</b><span>Has verano</span></div>
   <div><b id="sIn">0</b><span>Has invierno</span></div>
 </div>
@@ -54,14 +56,25 @@ td.n,th.n{text-align:right}
 <div class="card">
 <form id="f">
   <input type="hidden" id="id">
+  <div class="sec-t">Cliente</div>
   <label>Cliente<input id="cliente" required></label>
   <label>Teléfono<input id="tel" type="tel" inputmode="tel" placeholder="099 123 456"></label>
   <label>Quién pica<input id="quien" placeholder="Contratista / maquinista"></label>
   <label>Ubicación (link de Google Maps o dirección)<input id="ub" placeholder="https://maps.app.goo.gl/… o dirección"></label>
-  <label>Vacas en ordeñe (V.O.)<input id="vo" type="number" min="0" inputmode="numeric"></label>
+  <div class="sec-t">Establecimiento</div>
+  <label>Tipo<select id="tipo"><option value="">—</option><option>Tambo</option><option>Corral</option><option>Tambo y corral</option></select></label>
+  <label>Animales (cantidad)<input id="an" type="number" min="0" inputmode="numeric"></label>
+  <div class="sec-t">Picado de verano</div>
+  <label>Cultivo<select id="cv"></select></label>
+  <label id="cvoL" hidden>Otro cultivo<input id="cvo" placeholder="Escribí el cultivo"></label>
   <label>Has pica verano<input id="ve" type="number" min="0" step="any" inputmode="decimal"></label>
+  <div class="sec-t">Picado de invierno</div>
+  <label>Cultivo<select id="ci"></select></label>
+  <label id="cioL" hidden>Otro cultivo<input id="cio" placeholder="Escribí el cultivo"></label>
   <label>Has pica invierno<input id="inv" type="number" min="0" step="any" inputmode="decimal"></label>
+  <div class="sec-t">Seguimiento</div>
   <label>Fecha de visita / contacto<input id="fv" type="date"></label>
+  <label class="full">Comentario<textarea id="com" placeholder="Cualquier dato adicional…"></textarea></label>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="sec" id="gps">📍 Mi ubicación</button><button type="submit" id="save">Agregar</button><button type="button" class="sec" id="cancel" hidden>Cancelar</button></div>
 </form>
 </div>
@@ -74,7 +87,9 @@ td.n,th.n{text-align:right}
   <div class="tw"><table>
     <thead><tr>
       <th data-k="cliente">Cliente</th><th data-k="tel">Teléfono</th><th data-k="quien">Quién pica</th><th data-k="ub">Ubicación</th>
-      <th class="n" data-k="vo">V.O.</th><th class="n" data-k="ve">Has verano</th><th class="n" data-k="inv">Has invierno</th><th data-k="fv">Última visita</th><th></th>
+      <th data-k="tipo">Tipo</th><th class="n" data-k="an">Animales</th>
+      <th data-k="cv">Cultivo verano</th><th class="n" data-k="ve">Has verano</th><th data-k="ci">Cultivo invierno</th><th class="n" data-k="inv">Has invierno</th>
+      <th data-k="fv">Última visita</th><th data-k="com">Comentario</th><th></th>
     </tr></thead>
     <tbody id="tb"></tbody>
   </table></div>
@@ -82,9 +97,14 @@ td.n,th.n{text-align:right}
 </main>
 
 <script>
-const KEY="clientes_pica_v1";
-let rows=[],sortK="cliente",sortDir=1;
 const $=i=>document.getElementById(i);
+const KEY="clientes_pica_v1";
+const CROPS=["Maíz","Sorgo","Moha","Avena","Cebada","Trigo","Raigrás","Alfalfa","Pastura / pradera","Otro"];
+function fillSel(id){const s=$(id);s.innerHTML="<option value=\"\">—</option>"+CROPS.map(c=>"<option>"+c+"</option>").join("")}
+function getCrop(s,t){const v=$(s).value;return v==="Otro"?($(t).value.trim()||"Otro"):v}
+function setCrop(s,t,v){const S=$(s),T=$(t);if(!v){S.value="";T.value=""}else if(CROPS.includes(v)&&v!=="Otro"){S.value=v;T.value=""}else{S.value="Otro";T.value=v==="Otro"?"":v}tog(s,t)}
+function tog(s,t){$(t+"L").hidden=$(s).value!=="Otro"}
+let rows=[],sortK="cliente",sortDir=1;
 try{rows=JSON.parse(localStorage.getItem(KEY)||"[]")}catch(e){rows=[]}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(rows))}catch(e){}}
 let API="";try{API=localStorage.getItem("pica_api")||""}catch(e){}
@@ -107,7 +127,7 @@ async function saveRow(o){o=norm(o);const i=rows.findIndex(r=>r.id===o.id);
   if(i>=0)rows[i]=o;else rows.push(o);persist();render();await post({action:"upsert",rows:[o]})}
 async function delRow(id){rows=rows.filter(r=>r.id!==id);persist();render();await post({action:"delete",id})}
 function nfv(v){v=String(v||"");if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;const d=new Date(v);return isNaN(d)?"":iso(d)}
-function norm(o){return{id:String(o.id),cliente:o.cliente||"",tel:String(o.tel||""),quien:o.quien||"",ub:o.ub||"",vo:num(o.vo),ve:num(o.ve),inv:num(o.inv),fv:nfv(o.fv)}}
+function norm(o){return{id:String(o.id),cliente:o.cliente||"",tel:String(o.tel||""),quien:o.quien||"",ub:o.ub||"",tipo:o.tipo||"",an:num(o.an!==undefined?o.an:o.vo),cv:o.cv||"",ve:num(o.ve),ci:o.ci||"",inv:num(o.inv),fv:nfv(o.fv),com:o.com||""}}
 const num=v=>parseFloat(v)||0;
 function mapUrl(v){v=v.trim();return /^https?:\/\//i.test(v)?v:"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(v)}
 
@@ -115,11 +135,11 @@ const fmt=n=>n.toLocaleString("es-UY",{maximumFractionDigits:1});
 
 function render(){
   const w=ventana();const q=$("q").value.toLowerCase();
-  let list=rows.filter(r=>(r.cliente+" "+(r.tel||"")+" "+r.quien+" "+(r.ub||"")).toLowerCase().includes(q));
+  let list=rows.filter(r=>[r.cliente,r.tel,r.quien,r.ub,r.tipo,r.cv,r.ci,r.com].join(" ").toLowerCase().includes(q));
   list.sort((a,b)=>{const x=a[sortK],y=b[sortK];
     return (typeof x==="number"?x-y:String(x).localeCompare(String(y),"es"))*sortDir});
   const tb=$("tb");tb.textContent="";
-  if(!list.length){const tr=tb.insertRow(),td=tr.insertCell();td.colSpan=9;td.className="empty";td.textContent="Sin registros";}
+  if(!list.length){const tr=tb.insertRow(),td=tr.insertCell();td.colSpan=13;td.className="empty";td.textContent="Sin registros";}
   list.forEach(r=>{
     const tr=tb.insertRow();
     tr.insertCell().textContent=r.cliente;
@@ -127,9 +147,15 @@ function render(){
     tr.insertCell().textContent=r.quien;
     const u=tr.insertCell();
     if(r.ub){const a=document.createElement("a");a.href=mapUrl(r.ub);a.target="_blank";a.rel="noopener";a.textContent="📍 Ver mapa";a.style.color="var(--ac)";u.append(a)}
-    [r.vo,r.ve,r.inv].forEach(v=>{const c=tr.insertCell();c.textContent=fmt(v);c.className="n"});
+    tr.insertCell().textContent=r.tipo||"—";
+    const ca=tr.insertCell();ca.textContent=fmt(r.an);ca.className="n";
+    tr.insertCell().textContent=r.cv||"—";
+    const cve=tr.insertCell();cve.textContent=fmt(r.ve);cve.className="n";
+    tr.insertCell().textContent=r.ci||"—";
+    const cin=tr.insertCell();cin.textContent=fmt(r.inv);cin.className="n";
     const fc=tr.insertCell();fc.textContent=r.fv?r.fv.split("-").reverse().join("/"):"—";
     if(w.on&&(!r.fv||r.fv<w.start)){const b=document.createElement("span");b.className="badge";b.textContent="⚠ Sin contactar";fc.append(b)}
+    const cm=tr.insertCell();cm.textContent=r.com||"";cm.className="cm";cm.title=r.com||"";
     const c=tr.insertCell();
     const h=document.createElement("button");h.className="dg";h.style.color="var(--ac)";h.textContent="✓ Hoy";h.title="Marcar contactado hoy";h.onclick=()=>saveRow({...r,fv:iso(new Date())});
     const e=document.createElement("button");e.className="dg";e.style.color="var(--ac)";e.textContent="Editar";e.onclick=()=>edit(r.id);
@@ -142,20 +168,24 @@ function render(){
     al.append(p.length?p.map(r=>r.cliente).join(", "):"Todos los clientes fueron contactados. ¡Bien!")}
   else{al.className="alert info";al.textContent="Próxima ronda de contactos: primeros días de "+w.mes+" ("+w.next.getFullYear()+"). Ese día te aparecerá la alerta con los clientes sin contactar."}
   $("sC").textContent=list.length;
-  $("sV").textContent=fmt(list.reduce((s,r)=>s+r.vo,0));
+  $("sT").textContent=list.filter(r=>/tambo/i.test(r.tipo)).length;
+  $("sK").textContent=list.filter(r=>/corral/i.test(r.tipo)).length;
+  $("sV").textContent=fmt(list.reduce((s,r)=>s+r.an,0));
   $("sVe").textContent=fmt(list.reduce((s,r)=>s+r.ve,0));
   $("sIn").textContent=fmt(list.reduce((s,r)=>s+r.inv,0));
 }
-function reset(){$("f").reset();$("id").value="";$("save").textContent="Agregar";$("cancel").hidden=true}
+function reset(){$("f").reset();tog("cv","cvo");tog("ci","cio");$("id").value="";$("save").textContent="Agregar";$("cancel").hidden=true}
 function edit(id){const r=rows.find(x=>x.id===id);if(!r)return;
-  $("id").value=id;$("cliente").value=r.cliente;$("tel").value=r.tel||"";$("quien").value=r.quien;$("ub").value=r.ub||"";$("vo").value=r.vo;$("ve").value=r.ve;$("inv").value=r.inv;$("fv").value=r.fv||"";
+  $("id").value=id;$("cliente").value=r.cliente;$("tel").value=r.tel||"";$("quien").value=r.quien;$("ub").value=r.ub||"";
+  $("tipo").value=r.tipo||"";$("an").value=r.an;setCrop("cv","cvo",r.cv);$("ve").value=r.ve;setCrop("ci","cio",r.ci);$("inv").value=r.inv;$("fv").value=r.fv||"";$("com").value=r.com||"";
   $("save").textContent="Guardar";$("cancel").hidden=false;window.scrollTo({top:0,behavior:"smooth"})}
 function del(id){if(!confirm("¿Borrar este cliente?"))return;delRow(id)}
 $("f").onsubmit=e=>{e.preventDefault();
   const o={id:$("id").value||String(Date.now()),cliente:$("cliente").value.trim(),tel:$("tel").value.trim(),quien:$("quien").value.trim(),ub:$("ub").value.trim(),
-    vo:num($("vo").value),ve:num($("ve").value),inv:num($("inv").value),fv:$("fv").value};
+    tipo:$("tipo").value,an:num($("an").value),cv:getCrop("cv","cvo"),ve:num($("ve").value),ci:getCrop("ci","cio"),inv:num($("inv").value),fv:$("fv").value,com:$("com").value.trim()};
   saveRow(o);reset()};
 $("cancel").onclick=reset;
+fillSel("cv");fillSel("ci");$("cv").onchange=()=>tog("cv","cvo");$("ci").onchange=()=>tog("ci","cio");
 $("gps").onclick=()=>{
   if(!navigator.geolocation){alert("Tu navegador no permite obtener la ubicación.");return}
   navigator.geolocation.getCurrentPosition(p=>{$("ub").value=p.coords.latitude.toFixed(6)+", "+p.coords.longitude.toFixed(6)},
@@ -166,8 +196,9 @@ document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
   const k=th.dataset.k;sortDir=(sortK===k)?-sortDir:1;sortK=k;render()});
 $("exp").onclick=async()=>{
   const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const csv="\uFEFFCliente;Telefono;Quien pica;Ubicacion;V.O.;Has verano;Has invierno;Ultima visita\n"+
-    rows.map(r=>[esc(r.cliente),esc(r.tel||""),esc(r.quien),esc(r.ub||""),String(r.vo).replace(".",","),String(r.ve).replace(".",","),String(r.inv).replace(".",","),r.fv||""].join(";")).join("\n");
+  const n=v=>String(v).replace(".",",");
+  const csv="\uFEFFCliente;Telefono;Quien pica;Ubicacion;Tipo;Animales;Cultivo verano;Has verano;Cultivo invierno;Has invierno;Ultima visita;Comentario\n"+
+    rows.map(r=>[esc(r.cliente),esc(r.tel||""),esc(r.quien),esc(r.ub||""),esc(r.tipo||""),n(r.an),esc(r.cv||""),n(r.ve),esc(r.ci||""),n(r.inv),r.fv||"",esc(r.com||"")].join(";")).join("\n");
   try{
     const dl=window.claude&&await window.claude.use("downloads");
     if(dl){await dl.save({filename:"clientes_pica.csv",data:csv});return}
